@@ -9,12 +9,15 @@ PluginSetup("Indicator++ - xSlapppz");
 
 IMenu* MainMenu;
 IMenu* Options;
+IMenu* Keystones;
 
 IMenuOption* Q;
 IMenuOption* W;
 IMenuOption* E;
 IMenuOption* R;
 IMenuOption* IG;
+IMenuOption* Thunderlords;
+IMenuOption* Fervor;
 IMenuOption* ColorR;
 IMenuOption* ColorG;
 IMenuOption* ColorB;
@@ -22,18 +25,21 @@ IMenuOption* AA;
 
 ISpell* Qspell, *Wspell, *Espell, *Rspell, *Ignite;
 
-Indicator HB = Indicator();
+Indicator HB = Indicator(true,true);
 
 void Menu()
 {
 	MainMenu = GPluginSDK->AddMenu("Indicator++");
 	Options = MainMenu->AddMenu("Options");
+	Keystones = Options->AddMenu("Keystones");
 	AA = Options->AddInteger("Add Auto Attacks",0,15,0);
 	Q = Options->CheckBox("Q",true);
 	W = Options->CheckBox("W", true);
 	E = Options->CheckBox("E", true);
 	R = Options->CheckBox("R", true);
 	IG = Options->CheckBox("Ignite", true);
+	Thunderlords = Keystones->CheckBox("Thunderlords", true);
+	Fervor = Keystones->CheckBox("Fervor of Battle", true);
 	ColorR = Options->AddInteger("Red", 0, 255, 67);
 	ColorG = Options->AddInteger("Green", 0, 255, 80);
 	ColorB = Options->AddInteger("Blue", 0, 255, 233);
@@ -48,8 +54,10 @@ void Spells()
 	Ignite = GPluginSDK->CreateSpell(GEntityList->Player()->GetSpellSlot("summonerdot"), 999);
 }
 
+//Major fix needed, probably needs custom calculation.
 double CalculateComboDamage(IUnit* enemy)
 {
+	float AutoDmg = GDamage->GetAutoAttackDamage(GEntityList->Player(), enemy, true) * (1 + GEntityList->Player()->Crit());
 	double dmg = 0;
 	
 	if (Q->Enabled() && Qspell->IsReady())
@@ -63,7 +71,9 @@ double CalculateComboDamage(IUnit* enemy)
 	if (Ignite->GetSpellSlot() != kSlotUnknown && Ignite->IsReady())
 		dmg += GDamage->GetSummonerSpellDamage(GEntityList->Player(), enemy, kSummonerSpellIgnite);
 	if (AA->GetInteger() > 0)
-		dmg += (GDamage->GetAutoAttackDamage(GEntityList->Player(), enemy, true) * AA->GetInteger());
+		dmg += AutoDmg * AA->GetInteger();
+	if (Thunderlords->Enabled() && !GEntityList->Player()->HasBuff("masterylordsdecreecooldown"))
+		dmg += (10 * GEntityList->Player()->GetLevel()) + (GEntityList->Player()->PhysicalDamage() * 0.30f) + (GEntityList->Player()->MagicDamage() * 0.10f);
 	
 	return dmg;
 }
@@ -74,8 +84,7 @@ PLUGIN_EVENT(void) OnRender()
 	{
 		if (enemy != nullptr && enemy->IsVisible() && !enemy->IsDead())
 		{
-			HB.setHero(enemy);
-			HB.drawDmg(CalculateComboDamage(enemy), Vec4(ColorR->GetInteger(), ColorG->GetInteger(), ColorB->GetInteger(), 255));
+			HB.drawDmg(CalculateComboDamage(enemy));
 		}
 	}
 }
@@ -87,6 +96,10 @@ PLUGIN_API void OnLoad(IPluginSDK* PluginSDK)
 	Menu();
 	Spells();
 	GGame->PrintChat("Indicator++ Loaded!");
+	GGame->PrintChat("1 - Physical Damage");
+	GGame->PrintChat("2 - Spell Damage");
+	GGame->PrintChat("3 - True Damage");
+	GGame->PrintChat("4 - Mixed Damage");
 
 	GEventManager->AddEventHandler(kEventOnRender, OnRender);
 
